@@ -82,3 +82,25 @@
 - **结论**:新增 `docs/03-提示词剧本.md`:P0-P13 共 14 步 + 6 个通用修复提示词;每步统一为"目标-背景约束-验收-交付证据"
 - **设计取舍**:要求 AI 每步贴出真实命令输出和截图(防止"看起来对");换会话用 P0 恢复上下文(文档作为 AI 的外部记忆)
 - **来源**:开发者提出,AI 设计
+
+## D-013 P1 脚手架阶段的决策与发现
+- **时间**:2026-10-12
+- **开发者输入**:按提示词剧本 P1 执行,要求空窗口带安全配置、单实例锁、Ant Design 页面
+- **决策与理由**:
+  1. **CSP 用 Vite 插件注入 `<meta>`,开发/生产两套策略**。生产严格(无内联脚本、无 unsafe-eval、不允许任何外连);开发放宽以支持 HMR。备选"主进程 onHeadersReceived 改响应头"被放弃,因为对 `file://` 加载是否生效没有把握。策略字符串抽成纯函数 `src/shared/csp.ts` 并有单元测试。
+  2. **`style-src` 保留 `'unsafe-inline'`**:Ant Design 的 CSS-in-JS 运行时注入 `<style>`。只影响样式不影响脚本,风险可接受,已写入代码注释。
+  3. **去掉 `frame-ancestors`**:通过 meta 下发会被浏览器忽略并在控制台报警告,在本应用无意义。
+  4. **安全策略双层实现**:窗口 webPreferences(contextIsolation / sandbox / 关闭 nodeIntegration)+ 全局 `web-contents-created` 钩子(拒绝导航、重定向、window.open、webview、所有权限请求),新建的任何窗口都自动受保护。
+  5. **脚手架里放了一个 `app:info` IPC**:不是业务需要,而是为了"端到端自检"渲染层→preload→主进程整条链路,避免后面才发现链路不通。
+  6. **e2e 测试提前到 P1**(原计划 P4):空窗口也需要"窗口确实出现、配置确实生效"的证据。
+  7. **eslint 配置用 `.mjs`**:package.json 不是 `type: module`,避免 ESM 语法歧义。
+  8. **tsconfig 拆成 node / web / e2e 三份**:e2e 里 `page.evaluate` 的回调在浏览器里执行,需要 DOM 类型,但不能让 main 进程代码也能用到 DOM 全局。
+- **发现的问题与修正**:
+  - TypeScript 抓到:Electron 44 的类型里**不存在 `webContents.getLastWebPreferences`**。原计划靠它断言安全配置,改为**行为证据**:沙箱用 `app.getAppMetrics()` 的 `sandboxed` 字段;contextIsolation 用"`exposeInMainWorld` 仅在隔离开启时才成功"反推;nodeIntegration 用页面内 `require/process` 为 undefined。比读配置值更有说服力。
+  - 版本现状:antd 6、React 19、TypeScript 6、Vitest 5、ESLint 10(比设计文档编写时假设的大版本更新),当前全部兼容。
+- **测试有效性验证(变异测试)**:故意把 `sandbox` 改成 false、去掉 `will-navigate` 拦截、去掉单实例锁,对应 3 个测试**全部如期失败**;恢复后 7 项重新全绿。证明测试不是摆设。
+- **验收结果**:typecheck、lint、format:check 退出码 0;单元 5/5;e2e 7/7;build 成功;`npm run dev` 实际弹出标题为 VideoConverter 的窗口(截图见 `docs/screenshots/`)。
+- **来源**:AI 决定并执行,开发者审阅
+
+## 待开发者确认的事项
+- `docs/03-提示词剧本.md` 在工作区中被删除(最近一次提交里仍然存在)。AI 未执行过该删除,因此本次提交**未包含**该删除,也未擅自恢复。如需恢复:`git restore docs/03-提示词剧本.md`。
