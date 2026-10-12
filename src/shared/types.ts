@@ -64,3 +64,44 @@ export interface VideoInfo {
   /** 主视频流(第一条真正的视频流)的旋转角度,没有视频时为 0 */
   rotation: Rotation
 }
+
+// ---------- 探测错误(可序列化,会通过 IPC 传给渲染层)----------
+
+export type ProbeErrorCode =
+  | 'INVALID_PATH' // 不是绝对路径
+  | 'FILE_NOT_FOUND'
+  | 'NOT_A_FILE' // 是目录等
+  | 'EMPTY_FILE' // 0 字节
+  | 'NO_PERMISSION'
+  | 'NOT_MEDIA' // 不是音视频文件(文本、图片、其他格式)
+  | 'CORRUPT' // 看起来是音视频文件,但已损坏或不完整
+  | 'TIMEOUT'
+  | 'FFPROBE_UNAVAILABLE' // ffprobe 本身无法运行
+  | 'UNKNOWN'
+
+export interface ProbeError {
+  code: ProbeErrorCode
+  /** 给用户看的人话 */
+  message: string
+  /** 给开发者排错用的原始信息(ffprobe stderr 的末尾),可能为 null */
+  detail: string | null
+}
+
+export type ProbeResult = { ok: true; info: VideoInfo } | { ok: false; error: ProbeError }
+
+// ---------- 缩略图 ----------
+
+export type ThumbnailKind =
+  | 'frame' // 从视频里抽出的一帧
+  | 'cover' // 音频文件的内嵌封面
+  | 'placeholder' // 占位图
+
+export interface Thumbnail {
+  kind: ThumbnailKind
+  /** 可直接用于 <img src> 的 data URL(JPEG 或 SVG) */
+  dataUrl: string
+  /** 抽帧位置(秒);封面和占位图为 null */
+  timestampSec: number | null
+  /** 为什么是占位图:没有可视内容 / 抽帧失败 */
+  reason: 'no-visual' | 'extract-failed' | null
+}

@@ -125,3 +125,37 @@
 - **工程小插曲**:`.mjs` 脚本未被 ESLint 配成 Node 环境导致 `console` 报 no-undef,修配置而不是加豁免;含中文的临时 PowerShell 脚本再次因缺 BOM 解析失败(ENVIRONMENT.md 第 6 条已记录的同类问题)。
 - **已知限制**:HDR、色彩空间、章节、多视频流选择策略暂不解析,后续有需要再加;码率估算只是估算。
 - **来源**:AI 决定并执行,开发者审阅
+
+## D-015 P3 主进程服务层:ffmpeg-locator、process-runner、probe-service、thumbnail-service
+- **时间**:2026-10-12
+- **开发者要求**:在主进程实现与 ffmpeg 交互的服务层,并用真实 ffmpeg 做集成测试;必须覆盖"路径含中文和空格""损坏文件(随机字节)""不存在的文件""取消后无残留 ffmpeg 进程"。
+- **关键决策**:
+  1. **进程只用 `spawn(file, args[], { shell: false })`**。集成测试用 `node -e` 回显参数,验证 `& | > $() % 引号 中文 空格` 原样到达目标程序;可执行文件不存在时抛 `SpawnError`(ENOENT),不会挂起。
+  2. **Windows 取消 = `taskkill /PID <pid> /T /F`**。`child.kill()` 只杀直接子进程,会留下孙进程。测试用 `cmd.exe /c ffmpeg ...` 造出"父进程+孙进程"两层,取消前断言 ≥2 个带标记的进程,取消后断言 0 个。非 Windows 分支只是 `SIGKILL` 单进程,**本机无法验证,未测试**(项目目标平台为 Windows)。
+  3. **进程追踪表 + `killAllRunning()`**:退出应用时一次结束所有存活子进程,避免残留(P9 的退出流程会调用)。
+  4. **stdin 写 `q` 可让 ffmpeg 优雅退出(退出码 0)**,已用真实 ffmpeg 验证;P6 取消转换时将先发 `q` 再兜底 taskkill,这样输出文件有机会被正确收尾。
+  5. **按行读取处理 `\n`、`\r\n`、`\r`**(ffmpeg 进度用 `\r` 刷新),且 `\r` 与 `\n` 被拆在两个数据块之间时不产生空行;中文被拆在块边界也不乱码(`StringDecoder`,并在 close 时 `end()` 冲刷)。
+  6. **自定义路径不存在时明确报错,不静默回退到内置版本**。否则用户设置了错误路径却悄悄用了别的程序,出问题时无法排查。只自定义 ffmpeg 时,优先用同目录的 ffprobe(版本更可能匹配),没有再回退内置。
+  7. **asar 路径替换放在 core 纯函数 `toUnpackedPath`**,可单测;集成测试用模拟的 `app.asar` 目录结构验证实际使用的是 `app.asar.unpacked` 里的文件(风险 R-04)。
+  8. **probe-service 的失败分类顺序**:路径非绝对→INVALID_PATH;stat 失败→FILE_NOT_FOUND/NO_PERMISSION;目录→NOT_A_FILE;0 字节→EMPTY_FILE;再读 512 字节文件头并运行 ffprobe;失败后按"stderr 权限/不存在 → 文件头嗅探或扩展名属于媒体格式则 CORRUPT,否则 NOT_MEDIA"判定。**设计取舍**:用户把一个文本文件改名为 `.mp4`,在他眼里就是"坏掉的视频",所以判为 CORRUPT 而不是 NOT_MEDIA;`.png` 等静态图片单独提示"这是一张图片,不是视频"。
+  9. **所有服务函数永不抛异常**,返回结构化结果(`ProbeResult` / `Thumbnail`),方便 IPC 层直接透传。
+  10. **缩略图**:`-ss` 放在 `-i` 前(输入级 seek,快);宽度用 `min(320,iw)` 避免放大小视频;高度 `-2` 保证偶数;`format=yuvj420p` + `-f mjpeg pipe:1` 直接从 stdout 取 JPEG,不写临时文件(省去清理和路径问题)。时长 <1s 或未知取第 0 帧。带封面图的 mp3 使用封面(`kind: 'cover'`);纯音频/损坏文件返回内联 SVG 占位图,并带 `reason`(`no-visual` / `extract-failed`)供 UI 区分。
+  11. **seek 失败兜底**:元数据声称很长但实际文件很短时,目标时间点取不到帧,自动退回第 0 帧重试;测试里用伪造的 `durationSec: 1000` 复现。
+  12. **集成测试夹具**由 `scripts/make-fixtures.ts` 用 ffmpeg lavfi 生成(`FIXTURE_VERSION` 版本戳避免重复生成),通过 vitest `globalSetup` 自动确保存在;输出在已被 `.gitignore` 忽略的 `tests/fixtures/generated`。包含正常 / 无音轨 / 竖屏 / 旋转元数据 / 极短 / 红绿蓝分段(验证取帧位置)/ 纯音频 / 封面 mp3 / 中文+空格路径 / 特殊字符路径 / 随机字节损坏 / 截断 / 0 字节 / 文本 / 假 mp4 / PNG / 目录。随机字节用固定种子的 LCG 生成,保证每次一致;文件头强制为 `00 01 02 03`,避免偶然像某种媒体格式。
+  13. **脚本直接用 Node 24 原生 TypeScript 运行**(`node scripts/make-fixtures.ts`),不引入 tsx / ts-node;不设置 package.json 的 `"type": "module"`(会破坏 electron-vite 的 CJS preload),因此加 `--disable-warning=MODULE_TYPELESS_PACKAGE_JSON`。
+  14. **vitest 拆为 `unit` 与 `integration` 两个 project**(`npm run test:unit` / `npm run test:integration`),集成测试单测超时 60s。
+- **测试自身的错误(不是产品缺陷,已修正)**:
+  - 红绿蓝夹具我以为恰好 10s,实际 10.04s,"取帧在 10%"的断言由等于 1 改为 `toBeCloseTo(1, 1)`。
+  - 我断言"绿色通道 > 150",但 ffmpeg 的 `green` 颜色名是 `(0,128,0)`;改为"目标通道比其他通道至少高 80"。红色同理。
+  - 一个缩略图用例的名称与内容不符(写成"缩小",实际测竖屏),已改名。
+  - 变异脚本第一版有 bug(单元素嵌套数组被 PowerShell 展平,导致源码根本没被修改,15 个变异被**误报**为"未抓到");修好后重跑,没有因此降低判定标准。
+- **本步自查中发现并修复**:
+  - `core/thumbnail.ts` 里曾用 `Buffer`,core 同时被 web tsconfig 编译,会类型报错 → 把 `toJpegDataUrl` 移到 thumbnail-service。
+  - ESLint 两处:`preserve-caught-error`(抛新错误时补 `{ cause }`)、`no-useless-assignment`(去掉多余初值)。
+- **变异验证(故意植入缺陷)**:16 个缺陷 **16/16 被抓到**:`shell:true`、taskkill 去掉 `/T`、取消不标记 canceled、逐块解码造成乱码、结束的进程不出追踪表、空文件检查失效、静态图片判定失效、取帧失败不退回第 0 帧、不校验 JPEG 内容、跳过 asar 路径替换、`-ss` 放在 `-i` 之后、小视频被放大、允许奇数高度、极短视频阈值 1s→0、CR/LF 跨块产生空行、丢掉"扩展名属于媒体格式"规则。
+- **最终结果**:`test:unit` 230/230;`test:integration` 69/69(约 8 秒);`test:e2e` 7/7;typecheck、lint、format:check、build 退出码均为 0;测试结束后系统中无残留 ffmpeg 进程。
+- **已知局限 / 待后续验证**:
+  - 服务层此刻还没被 main 进程引用,所以 `npm run build` 并未打包它们;`ffmpeg-locator` 里用 `createRequire(__filename)` 在 electron-vite 打包产物中的行为,要等 P4 接入 IPC 后才能实际验证(风险已记入,P12 打包后再验一次)。
+  - 超时(`timedOut`)和 `AbortSignal` 都走同一个 killProcessTree,已测试;但"进程在被杀前已退出"的竞态只测了 cancel-after-exit 一种。
+  - 硬件加速的可用性探测不在本步,留给 P8。
+- **来源**:AI 起草并执行,开发者审阅
