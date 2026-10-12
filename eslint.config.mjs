@@ -26,10 +26,11 @@ export default tseslint.config(
     files: [
       'src/main/**/*.ts',
       'src/preload/**/*.ts',
-      'scripts/**/*.ts',
+      'scripts/**/*.{ts,mjs}',
       'tests/**/*.ts',
       '*.ts',
-      '*.js'
+      '*.js',
+      '*.mjs'
     ],
     languageOptions: { globals: globals.node }
   },
