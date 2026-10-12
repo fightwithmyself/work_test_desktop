@@ -19,10 +19,11 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "fixtures": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/make-fixtures.ts",
-    "test:e2e": "npm run build && playwright test",
+    "test:e2e": "npm run build && npm run fixtures && playwright test",
     "dist": "npm run build && electron-builder --win"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.3.4",
     "@ffprobe-installer/ffprobe": "^2.1.2",
     "antd": "^6.6.5",
     "ffmpeg-static": "^5.3.0",

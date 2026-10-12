@@ -1,29 +1,30 @@
-import { _electron as electron, expect, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import type { ElectronApplication } from '@playwright/test'
+import { launchApp, screenshotPath } from './helpers'
 
 let app: ElectronApplication
 
 test.beforeAll(async () => {
-  // 如果外部环境设置了 ELECTRON_RUN_AS_NODE,Electron 会退化成 Node,必须去掉
-  const env = { ...process.env } as Record<string, string>
-  delete env['ELECTRON_RUN_AS_NODE']
-  app = await electron.launch({ args: [process.cwd()], env })
+  ;({ app } = await launchApp())
 })
 
 test.afterAll(async () => {
   await app?.close()
 })
 
-test('空窗口启动,标题与内容正确,且 preload→主进程 IPC 链路通', async () => {
+test('空窗口能启动,标题正确,且 preload→主进程 IPC 链路通', async () => {
   const page = await app.firstWindow()
   await expect(page).toHaveTitle('VideoConverter')
   await expect(page.getByRole('heading', { name: 'VideoConverter' })).toBeVisible()
-  // 这一项由主进程返回,证明 渲染层 → preload → IPC → 主进程 整条链路可用
-  await expect(page.getByTestId('app-info')).toContainText('Electron')
-  await page.screenshot({ path: 'docs/screenshots/p1-empty-window.png' })
+  // 空状态有引导,而不是一片空白
+  await expect(page.getByTestId('empty-state')).toContainText('把视频拖到这里')
+  // 通过一次真正的主进程返回,证明 渲染层 → preload → IPC → 主进程 链路通
+  const info = await page.evaluate(() => window.api.app.getInfo())
+  expect(info.electron).toMatch(/^\d+\./)
+  await page.screenshot({ path: screenshotPath('p4-empty-state.png') })
 })
 
-// Electron 44 的类型里没有 getLastWebPreferences,所以用"行为证据"验证安全配置,比读配置值更有说服力。
+// Electron 44 的类型里没有 getLastWebPreferences,因此用"行为证据"验证安全配置,比读配置值更有说服力
 test('安全配置:渲染进程运行在沙箱中', async () => {
   const sandboxed = await app.evaluate(({ app: electronApp }) =>
     electronApp
@@ -40,18 +41,24 @@ test('安全配置:contextIsolation 开启(exposeInMainWorld 只有在隔离开�
   expect(await page.evaluate(() => typeof window.api)).toBe('object')
 })
 
-test('渲染层拿不到 Node 能力,只有白名单 API', async () => {
+test('渲染层拿不到 Node 能力,只有白名单 API,且没有暴露 ipcRenderer', async () => {
   const page = await app.firstWindow()
   const result = await page.evaluate(() => ({
     require: typeof (window as unknown as { require?: unknown }).require,
     process: typeof (window as unknown as { process?: unknown }).process,
+    ipcRenderer: typeof (window as unknown as { ipcRenderer?: unknown }).ipcRenderer,
     apiKeys: Object.keys(window.api),
-    appKeys: Object.keys(window.api.app)
+    appKeys: Object.keys(window.api.app),
+    filesKeys: Object.keys(window.api.files),
+    mediaKeys: Object.keys(window.api.media)
   }))
   expect(result.require).toBe('undefined')
   expect(result.process).toBe('undefined')
-  expect(result.apiKeys).toEqual(['app'])
+  expect(result.ipcRenderer).toBe('undefined')
+  expect(result.apiKeys).toEqual(['app', 'files', 'media'])
   expect(result.appKeys).toEqual(['getInfo'])
+  expect(result.filesKeys).toEqual(['pick', 'getDroppedPaths'])
+  expect(result.mediaKeys).toEqual(['probe', 'thumbnail'])
 })
 
 test('拒绝 window.open 和页面导航', async () => {
@@ -85,6 +92,7 @@ test('生产构建的 CSP 严格:无 unsafe-eval,脚本不允许内联', async (
 test('单实例锁:第二个实例会立刻退出', async () => {
   const env = { ...process.env } as Record<string, string>
   delete env['ELECTRON_RUN_AS_NODE']
+  const { _electron: electron } = await import('@playwright/test')
   const second = await electron.launch({ args: [process.cwd()], env }).then(
     (a) => a,
     () => null
@@ -98,6 +106,6 @@ test('单实例锁:第二个实例会立刻退出', async () => {
     if (!exited) await second.close()
     expect(exited).toBe(true)
   }
-  // 原实例仍然存活且只有一个窗口
+  // 原实例仍然活着且只有一个窗口
   expect(app.windows()).toHaveLength(1)
 })

@@ -1,0 +1,241 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #f5f6f8;
+  overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e8e8ec;
+}
+
+.app-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.list-pane {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+/* ---------- 空状态 ---------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  height: 100%;
+  min-height: 320px;
+  border: 2px dashed #c9ccd3;
+  border-radius: 16px;
+  background: #fff;
+  text-align: center;
+  padding: 24px;
+}
+
+.empty-icon {
+  font-size: 64px;
+  color: #1677ff;
+}
+
+.empty-hint {
+  font-size: 12px;
+}
+
+/* ---------- 文件列表 ---------- */
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e8e8ec;
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.file-row:hover {
+  border-color: #91caff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 6%);
+}
+
+.file-row:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: 1px;
+}
+
+.file-row.selected {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgb(22 119 255 / 15%);
+}
+
+.file-row.failed {
+  background: #fff8f7;
+  border-color: #ffccc7;
+}
+
+.row-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.row-body .ant-skeleton-paragraph {
+  margin: 0 !important;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 0;
+}
+
+.row-error {
+  white-space: normal;
+}
+
+/* ---------- 缩略图 ---------- */
+.thumb {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #111;
+  border-radius: 8px;
+}
+
+.thumb img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.thumb .ant-skeleton,
+.thumb .ant-skeleton-element,
+.thumb .ant-skeleton-image {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0;
+}
+
+.thumb-empty {
+  color: #8c8c8c;
+  font-size: 32px;
+  background: #2a2a2e;
+}
+
+/* ---------- 信息面板 ---------- */
+.detail-panel {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: 380px;
+  background: #fff;
+  border-left: 1px solid #e8e8ec;
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.detail-name {
+  margin: 12px 0 !important;
+  word-break: break-all;
+}
+
+.detail-section {
+  margin-top: 16px;
+}
+
+.detail-section .ant-descriptions-item-label {
+  width: 96px;
+  white-space: nowrap;
+}
+
+.detail-section .ant-descriptions-item-content {
+  word-break: break-all;
+}
+
+.tech-detail {
+  margin-top: 12px;
+  color: #595959;
+  font-size: 12px;
+}
+
+.tech-detail pre {
+  margin: 6px 0 0;
+  padding: 8px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #f5f5f5;
+  border-radius: 6px;
+}
+
+/* ---------- 拖放遮罩 ---------- */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 20px;
+  color: #1677ff;
+  background: rgb(230 244 255 / 92%);
+  border: 3px dashed #1677ff;
+  pointer-events: none;
+}
+
+.drop-overlay .anticon {
+  font-size: 64px;
+}
