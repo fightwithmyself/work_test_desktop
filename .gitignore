@@ -1,0 +1,33 @@
+# dependencies & build output
+node_modules/
+out/
+dist/
+release/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# test artifacts (generated at test time, never commit media)
+tests/fixtures/generated/
+test-results/
+playwright-report/
+
+# logs / env / OS
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db
+
+# large binaries must never enter git history (see docs R-16)
+*.exe
+*.msi
+*.zip
+*.7z
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.webm
+*.gif
+!docs/screenshots/*.gif
