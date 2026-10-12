@@ -7,6 +7,8 @@ $cacheRoot = 'F:\devcache'
 # --- 缓存目录(全部在 F 盘)---
 $env:npm_config_cache         = "$cacheRoot\npm"
 $env:ELECTRON_CACHE           = "$cacheRoot\electron"
+# @electron/get 实际读取的是下面这个小写变量名(已实测:只设 ELECTRON_CACHE 会写到 C 盘)
+$env:electron_config_cache    = "$cacheRoot\electron"
 $env:ELECTRON_BUILDER_CACHE   = "$cacheRoot\electron-builder"
 $env:PLAYWRIGHT_BROWSERS_PATH = "$cacheRoot\playwright"
 $env:TEMP = "$cacheRoot\temp"

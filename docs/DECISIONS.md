@@ -62,3 +62,16 @@
 - **核实**:开工时 C 盘仅剩约 120 MB(此前测得 1.6 GB,说明在持续减少)
 - **决策**:所有缓存与下载产物强制放 F 盘(`F:\devcache\...`);`scripts/env.ps1` 内置 C 盘余量检查;不清理任何非本项目文件,是否清理 C 盘交由开发者决定
 - **来源**:AI 发现并采取预防措施,告知开发者
+
+## D-010 ffprobe 来源与 npm 安装脚本策略(环境阶段 AI 自行决定)
+- **决策点**:`ffprobe-static` 自带的 ffprobe 为 4.0.2(2018),与 ffmpeg 6.1.1 版本相差过大
+- **备选**:继续用 ffprobe-static / 手动下载 gyan 完整包取 ffprobe / 换用 `@ffprobe-installer/ffprobe`
+- **结论**:换用 `@ffprobe-installer/ffprobe`(2023-02 gyan 构建,同一来源,版本接近)
+- **理由**:旧版 ffprobe 对新编码与旋转元数据识别可能不准,会直接影响"视频信息显示";且该包是 npm 依赖,可复现
+- **附带**:npm 11 默认不跑安装脚本,对 `ffmpeg-static`、`esbuild` 显式放行并写入 `package.json`,`electron-winstaller` 拒绝
+- **来源**:AI 自行决定,已在 ENVIRONMENT.md 记录
+
+## D-011 硬件加速设计被本机实测验证
+- **事实**:本机 NVENC/AMF/QSV 在编码器列表中都存在,真实编码只有 QSV 可用(NVENC 驱动过旧 457.07,AMF 无 AMD 显卡)
+- **结论**:设计文档 4.6 的"真实小样本编码验证 + 失败自动回退软件编码"是必须项,不是可选项;本机的真实报错用作错误翻译与硬件检测的测试样本
+- **来源**:AI 实测发现
